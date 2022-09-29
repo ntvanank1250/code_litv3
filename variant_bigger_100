@@ -1,0 +1,161 @@
+		product_id=self.get_map_field_by_src(self.TYPE_PRODUCT, convert['id'], convert['code'])
+
+		if not convert["children"] or len(convert["children"])<=100 :
+			return True
+		
+		# xoa map
+		for child in convert["children"]:
+			self.select_raw("DELETE FROM migration_map WHERE type = 'product_child' AND id_src = "+to_str(child['id']))
+		
+		# replace convert
+		list_new_child=list()
+		list_option_value_name=["14k white gold","14k rose gold","14k yellow gold"]
+		for child in convert["children"]:
+			if child["attributes"][0]["option_value_name"].lower() in list_option_value_name:
+				list_new_child.append(child)
+			elif child["attributes"][1]["option_value_name"].lower() in list_option_value_name:
+				list_new_child.append(child)
+		convert["children"] = list_new_child
+		self.log(convert, "convert_after_replace")
+		
+		variants=list()
+
+		
+		sale_price = None
+		compare_price = None
+		if convert.get('special_price', dict()).get('price') and self.to_timestamp(convert['special_price']['start_date']) < time.time() and (self.to_timestamp(convert['special_price']['end_date']) > time.time() or (convert['special_price']['end_date'] == '0000-00-00' or convert['special_price']['end_date'] == '0000-00-00 00:00:00') or convert['special_price']['end_date'] == '' or convert['special_price']['end_date'] == None):
+			sale_price = convert['special_price']['price']
+			compare_price = convert['price'] if convert['price'] and round(to_decimal(convert['price']), 2) > round(to_decimal(sale_price), 2) else None
+		else:
+			sale_price = convert['price']
+			
+		# coppy tu import product len
+		img_children = dict()
+		ivt_children = dict()
+		_map = dict()
+		options = list()
+		index = 1
+		options_src = dict()
+		count = 0
+		option_value_dict = dict()
+		for child in convert['children']:
+			max_count = len(child['attributes']) if child['attributes'] else 0
+			if max_count > count:
+				count = max_count
+				options_src = child['attributes']
+			for option in options_src:
+				if option['option_name'] not in option_value_dict:
+					option_value_dict[option['option_name']] = dict()
+					option_value_dict[option['option_name']][option['option_value_id']] = option['option_value_name']
+				elif option['option_value_id'] not in option_value_dict[option['option_name']]:
+					option_value_dict[option['option_name']][option['option_value_id']] = option['option_value_name']
+		# self.log(option_value_dict, 'options')
+		if not count:
+			# self.log('Product id ' + to_str(convert['id']) + 'import failed. Please fill out children attributes!', 'product_errors')
+			return response_error('Product id ' + to_str(convert['id']) + 'import failed. Please fill out children attributes!', 'product_errors')
+		all_option_name = list()
+		for option in options_src:
+			if index == 4:
+				break
+			if option['option_name'] in all_option_name:
+				continue
+			all_option_name.append(option['option_name'])
+			_map[get_value_by_key_in_dict(option, 'option_id', option['option_code'])] = index
+			option_values = option_value_dict[to_str(option['option_name'])]
+			option_target = {
+				'product_id': product_id,
+				'position': index,
+				'name': to_str(option['option_name']).replace('/', '-')
+			}
+			if option_values:
+				option_target['values'] = list()
+				for key in sorted(option_values.keys()):
+					option_target['values'].append(option_values[key])
+
+			options.append(option_target)
+			index += 1
+		pos = 1
+		number_variant_imported = 0
+		# for
+		list_variants = list()
+		for child in convert['children']:
+			if number_variant_imported >= 100:
+				break
+			if child.get('special_price', dict()).get('price') and self.to_timestamp(convert['special_price']['start_date']) < time.time() and (self.to_timestamp(child['special_price']['end_date']) > time.time() or (child['special_price']['end_date'] == '0000-00-00' or child['special_price']['end_date'] == '0000-00-00 00:00:00') or child['special_price']['end_date'] == '' or child['special_price']['end_date'] == None):
+				child_sale_price = child.get('special_price', dict()).get('price')
+				child_compare_price = child['price'] if child['price'] and round(to_decimal(child['price']), 2) > round(to_decimal(child_sale_price), 2) else None
+			else:
+				child_sale_price = child['price']
+				child_compare_price = compare_price if compare_price and round(to_decimal(compare_price), 2) > round(to_decimal(child_sale_price), 2) else None
+			if 'thumb_image' in child and child['thumb_image']['url']:
+				if self._notice['src']['config'].get('auth'):
+					child['thumb_image']['url'] = self.join_url_auth(child['thumb_image']['url'])
+				img_children[str(pos)] = child['thumb_image']
+			ivt_children[str(pos)] = child['qty']
+
+			variant = {
+				'product_id': product_id,
+				'position': pos,
+				'title': to_str(child['name']).replace('/', '-'),
+				'sku': child['sku'] if child['sku'] else convert['sku'],
+				'price': round(to_decimal(child_sale_price), 2) if to_decimal(child_sale_price) > 0 else 0,
+				'compare_at_price': round(to_decimal(child_compare_price), 2) if child_compare_price and round(to_decimal(child_compare_price), 2) != round(to_decimal(child_sale_price), 2) else None,
+				'weight': to_decimal(child['weight']) if to_decimal(child['weight']) > 0 else 0,
+				'cost': get_value_by_key_in_dict(child, 'cost', None),
+				'inventory_policy': 'deny' if child['manage_stock'] else 'continue',
+				'inventory_management': 'shopify' if child['manage_stock'] else None,
+				'taxable': False
+			}
+			if child.get('barcode'):
+				variant['barcode'] = get_value_by_key_in_dict(child, 'barcode', get_value_by_key_in_dict(child, 'upc', get_value_by_key_in_dict(child, 'ean', '')))
+			else:
+				variant['barcode'] = get_value_by_key_in_dict(convert, 'barcode', get_value_by_key_in_dict(convert, 'upc', get_value_by_key_in_dict(convert, 'ean', '')))
+			pos += 1
+			map_current = dict()
+			for row in child['attributes']:
+				map_current[get_value_by_key_in_dict(row, 'option_id', row['option_code'])] = True
+
+			# diff two dict
+			map_empty = _map.copy()
+			for option_id, value in map_current.items():
+				if option_id in map_empty:
+					del map_empty[option_id]
+				else:
+					map_empty[option_id] = value
+			count_attr = 0
+			variant_option = dict()
+			for row in child['attributes']:
+				if get_value_by_key_in_dict(row, 'option_id', row['option_code']) in _map:
+					if count_attr >= 3:
+						break
+					variant['option' + to_str(_map[get_value_by_key_in_dict(row, 'option_id', row['option_code'])])] = row['option_value_name']
+					variant_option['option' + to_str(_map[get_value_by_key_in_dict(row, 'option_id', row['option_code'])])] = row['option_value_name']
+					count_attr += 1
+			if map_empty and len(map_empty):
+				for remain_id, value in map_empty.items():
+					if type(value) is not bool:
+						variant['option' + to_str(value)] = 'No Value'
+			if not self.check_variant_exist(variant_option, list_variants):
+				variants.append(variant)
+				list_variants.append(variant_option)
+
+			number_variant_imported += 1
+			# endfor
+		var_post_data = {
+			'product': {
+				'id': product_id,
+				'variants':variants,
+				'options':options
+			}
+		}
+
+		# day len tar get va log loi
+		var_response = self.api('products/' + to_str(product_id) + '.json', var_post_data, 'put')	
+		response = json_decode(var_response)
+		self.log(response,"response")	
+
+
+		#insert map	
+		if response['product']['variants']:
+			for k, v in enumerate(response['product']['variants']):
+				self.insert_map(self.TYPE_CHILD, convert['children'][k]['id'], v['id'])
