@@ -1,0 +1,114 @@
+import json
+from operator import index
+from turtle import pos
+import requests
+
+shop_url = "https://%s:%s@love-jc-ring.myshopify.com/admin/api/2022-10/" % ('0dd9ed7ff7871371c03bbc5a8c888438', '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')
+# get all products
+def get_products():
+    endpoint= 'products.json'
+    r = requests.get( shop_url +endpoint)
+    return r.json()
+
+def change_taxable(product_id,variant_id):
+    payload={
+                "variant" : {
+                    "id": variant_id,
+                    "taxable": True
+                    }
+            }
+    endpoint=f"products/{product_id}/variants/{variant_id}.json"
+    r = requests.put( shop_url +endpoint, json=payload)
+    print(f"{product_id} : {variant_id}")
+    print(r.json())
+    
+def get_product(productID):
+    endpoint= f'products/{productID}.json'
+    r = requests.get( shop_url +endpoint)
+    return r.json()
+def main():
+    list_ids = ["7702912205014","7702912434390","7702912663766","7702912860374","7702914662614","7702914859222","7702915350742","7702915645654","7702916104406","7702916366550","7702916759766","7702916923606","7702917185750","7702917611734","7702917808342","7702918103254","7702918267094","7702918496470","7702918758614","7702918987990","7702931275990","7702931865814","7702932390102","7702932783318","7702933307606","7702933635286","7702934094038","7702934585558","7702935240918","7702935863510","7702936060118","7702936256726","7702936486102","7702936748246","7702937075926","7702937338070","7702937698518","7702938157270","7702938419414","7702938648790","7702938845398","7702939173078","7702939435222","7702939795670","7702940188886","7702940647638","7702940909782","7702941532374","7702941892822","7702942318806","7702942810326","7702942941398","7702943301846","7702943531222","7702943989974","7702944252118","7702944547030","7702944940246","7702945562838","7702945923286","7702946250966","7702946611414","7702946939094","7702947365078","7702947823830","7702948184278","7702948610262","7702948905174","7702949429462","7702950183126","7702950510806","7702951035094","7702951297238","7702951821526","7702952214742","7702952607958","7702953033942","7702953296086","7702953754838","7702953984214","7702954442966","7702954770646","7702955032790","7702955458774","7702956179670","7702956605654","7702956900566","7702957261014","7702958047446","7702958375126","7702958702806","7702959063254","7702959489238","7702960111830","7702960341206","7702960898262","7702961291478","7702961619158","7702962241750","7702962569430","7702962929878","7702963257558","7702963618006","7702964076758","7702964437206","7702964732118","7702964928726","7702965223638","7702965485782","7702965682390","7702965878998","7702966141142","7702966468822","7702966796502","7702967156950","7702967419094","7702967582934","7702967779542","7702968008918","7702968139990","7702968434902","7702968631510","7702968828118","7702969188566","7702969352406","7702969483478","7702969647318","7702969974998","7702970466518","7702970794198","7702971089110","7702971449558","7702971711702","7702972170454","7702972530902","7702972694742","7702972956886","7702973284566","7702973546710","7702973939926","7702974431446","7702974955734","7702975348950","7702975545558","7702976069846","7702976463062","7702976954582","7702977413334","7702978035926","7702978396374","7702978822358","7702978986198","7702979182806","7702979608790","7702979805398","7702980133078","7702980493526","7702980788438","7702981443798","7702981804246","7702982230230","7702982557910","7702982754518","7702983016662","7702983672022","7702983803094","7702984098006","7702984261846","7702984655062","7702984818902","7702985179350","7702985507030","7702985801942","7702986096854","7702986555606","7702986850518","7702987309270","7702987768022","7702987964630","7702988325078","7702988685526","7702988914902","7702989209814","7702989570262","7702989897942","7702990192854","7702990323926","7702990454998","7704146182358","7704146280662",""]
+    list_ids = [7702933307606]
+    for id in list_ids:
+        r  = get_product(id)
+        try:
+            for variant in r["product"]["variants"]:
+                variant_id = variant['id']
+                change_taxable(id,variant_id)
+        except:
+            continue
+        
+main()
+
+#change price product
+def change_productsPrice(product_id,price):
+    payload={
+                "product" : {
+                    "variants" : [{
+                        "price" : price
+                        }]
+                }
+        }
+    endpoint=f"products/{product_id}.json"
+    r = requests.put( shop_url +endpoint, json=payload)
+    # print(r.json())
+    return
+#chang link image product
+def change_productsImage(product_id,image):
+    payload={
+                "product" : {
+                    "images" : [{
+                        "src" : image
+                        }]
+                }
+        }
+    endpoint=f"products/{product_id}.json"
+    r = requests.put( shop_url +endpoint, json=payload)
+    # print(r.json())
+    return
+    
+#create products (title,body_html,product_type,tags)
+def create_products(title,body_html,vendor,product_type,tags):
+    endpoint= 'products.json'
+    payload= {
+    "product":{
+        "title":title,
+        "body_html":body_html,
+        "vendor":vendor,
+        "product_type":product_type,
+        "tags":tags
+        }
+    }
+    r = requests.post( shop_url +endpoint, json=payload)
+    print(r.json)
+    return
+def add_product_option(product_id):
+    endpoint=f"products/{product_id}.json"
+    option = {
+    'name': 'color',
+    'product_id': product_id,
+    'values': ['blue', 'red']}
+    variant = {
+        'product_id': product_id,
+        'title': '',
+        'sku': '',
+        'price': '',
+        'compare_at_price': '',
+        'weight': 0,
+        'cost': 0,
+        'inventory_policy': '',
+        'inventory_management': '',
+        'taxable': False
+}
+    payload={"product":{"variants":variant,
+                        "options":option}}
+    print(payload)
+    r = requests.put(shop_url +endpoint, json=payload)
+    print(r.json)
+    return
+
+def del_product(productID):
+    endpoint=f"products/{productID}.json"
+    r = requests.delete( shop_url +endpoint)
+    print(r.json)
+    return
