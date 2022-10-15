@@ -11,14 +11,4 @@ if id_desc:
 	for child in convert['children']:
 		self.select_raw("DELETE FROM migration_map WHERE type = 'product_child' AND id_src = "+to_str(child['id']))
 
-  
- ## xóa hết 1 lần tùy entity mà phần xóa map thay đổi
-
- if 'product' not in self._notice:
-	self._notice['product'] = True
-	self.clear_target_products()
-	self.delete_obj('migration_map', where={'migration_id': self._migration_id, 'type': 'product'})
-	self.delete_obj('migration_map', where={'migration_id': self._migration_id, 'type': 'product_child'})
-	self.delete_obj('migration_map', where={'migration_id': self._migration_id, 'type': 'attr'})
-	self.delete_obj('migration_map', where={'migration_id': self._migration_id, 'type': 'attr_option'})
-	self.delete_obj('migration_map', where={'migration_id': self._migration_id, 'type': 'attr_value'})
+ 
